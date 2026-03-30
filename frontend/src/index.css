@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@theme {
+  --color-stone-base:    #1B1B1B;
+  --color-stone-surface: #242424;
+  --color-stone-border:  #2E2E2E;
+  --color-stone-muted:   #4A4A4A;
+  --color-stone-subtle:  #6B6B6B;
+  --color-stone-text:    #D1D1D1;
+  --color-stone-bright:  #E8E8E8;
+
+  --font-prose: Georgia, Cambria, "Times New Roman", serif;
+  --font-ui:    Inter, system-ui, sans-serif;
+}
+
+/* Global focus ring — consistent with the dark theme */
+*:focus-visible {
+  outline: 1px solid #4A4A4A;
+  outline-offset: 2px;
+}
+
+/* Thin dark scrollbars throughout the app */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2E2E2E; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #4A4A4A; }
