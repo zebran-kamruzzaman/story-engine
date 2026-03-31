@@ -117,22 +117,23 @@ func (a *App) syncOnStartup() {
 
 		exists, err := a.cache.FilePathExists(rel)
 		if err != nil {
-			log.Printf("sync: check %q: %v", rel, err)
+			log.Printf("sync: check file path %q: %v", rel, err)
 			continue
 		}
 		if !exists {
+			title := strings.TrimSuffix(rel, ".md")
 			maxIdx, _ := a.cache.GetMaxOrderIndex()
 			scene := models.Scene{
 				ID:           uuid.New().String(),
-				Title:        strings.TrimSuffix(rel, ".md"),
+				Title:        title,
 				FilePath:     rel,
 				OrderIndex:   maxIdx + 1,
 				LastModified: time.Now().Unix(),
 			}
 			if err := a.cache.CreateScene(scene); err != nil {
-				log.Printf("sync: register %q: %v", rel, err)
+				log.Printf("sync: register scene %q: %v", rel, err)
 			} else {
-				log.Printf("sync: registered %q", rel)
+				log.Printf("sync: registered new scene %q", rel)
 			}
 		}
 	}
@@ -145,9 +146,9 @@ func (a *App) syncOnStartup() {
 	for _, sc := range allScenes {
 		if !diskPaths[sc.FilePath] {
 			if err := a.cache.DeleteScene(sc.ID); err != nil {
-				log.Printf("sync: delete orphan %q: %v", sc.ID, err)
+				log.Printf("sync: delete orphan scene %q: %v", sc.ID, err)
 			} else {
-				log.Printf("sync: deleted orphan %q", sc.FilePath)
+				log.Printf("sync: deleted orphan record for %q", sc.FilePath)
 			}
 		}
 	}

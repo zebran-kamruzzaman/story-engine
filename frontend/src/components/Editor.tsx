@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useEditor } from '../hooks/useEditor'
 import { useSceneStore } from '../state/sceneStore'
+import { useEditorStore } from '../state/editorStore'
 
 export function Editor() {
   const { containerRef, loadScene, saveCursorState } = useEditor()
@@ -8,19 +9,16 @@ export function Editor() {
   const prevSceneIdRef = useRef<string | null>(null)
 
   const activeScene = scenes.find((s) => s.id === activeSceneId) ?? null
+  const saveState = useEditorStore((s) => s.saveState)
 
   useEffect(() => {
     const prevId = prevSceneIdRef.current
-
-    // Save cursor state of the scene we are leaving.
     if (prevId && prevId !== activeSceneId) {
       saveCursorState(prevId)
     }
-
     if (activeSceneId && activeScene) {
       loadScene(activeSceneId, activeScene.cursorPosition, activeScene.scrollTop)
     }
-
     prevSceneIdRef.current = activeSceneId ?? null
   }, [activeSceneId]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -31,25 +29,43 @@ export function Editor() {
         <span className="text-xs font-ui text-stone-subtle">
           {activeScene?.title ?? ''}
         </span>
-        <span className="text-xs font-ui text-stone-subtle">
-          {activeScene ? `${activeScene.wordCount.toLocaleString()} words` : ''}
-        </span>
+        <div className="flex items-center gap-3">
+          {saveState === 'saving' && (
+            <span className="text-xs font-ui text-stone-subtle italic">Saving…</span>
+          )}
+          {saveState === 'saved' && (
+            <span className="text-xs font-ui text-stone-muted">Saved</span>
+          )}
+          <span className="text-xs font-ui text-stone-subtle">
+            {activeScene ? `${activeScene.wordCount.toLocaleString()} words` : ''}
+          </span>
+        </div>
       </div>
 
-      {/* Editor surface */}
-      {activeSceneId ? (
+      {/* Editor area: always-mounted CodeMirror container + conditional overlay */}
+      <div className="flex-1 relative overflow-hidden">
+        {/*
+          This div is ALWAYS in the DOM. That's the fix.
+          useEditor's useEffect fires once on mount and finds containerRef.current
+          non-null, so EditorView gets created immediately.
+          Previously this was inside a conditional block — the effect ran before
+          the div existed and returned early, leaving the editor permanently unmounted.
+        */}
         <div
           ref={containerRef}
-          className="flex-1 overflow-hidden"
+          className="absolute inset-0"
           style={{ userSelect: 'text' }}
         />
-      ) : (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-stone-subtle text-sm font-ui italic">
-            No scene selected
-          </p>
-        </div>
-      )}
+
+        {/* Empty state overlay — sits on top of the editor when no scene is open */}
+        {!activeSceneId && (
+          <div className="absolute inset-0 flex items-center justify-center bg-stone-base pointer-events-none">
+            <p className="text-stone-subtle text-sm font-ui italic">
+              No scene selected
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
