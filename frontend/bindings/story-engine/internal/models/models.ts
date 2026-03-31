@@ -6,34 +6,60 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
+ * AppSettings stores LLM configuration. Persisted to ~/Documents/StoryEngine/settings.json.
+ * APIKey is optional — leave empty for local models (Ollama, LM Studio).
+ */
+export class AppSettings {
+    /**
+     * e.g. "http://localhost:11434/v1"
+     */
+    "llmEndpoint": string;
+
+    /**
+     * e.g. "llama3.2:3b"
+     */
+    "llmModel": string;
+
+    /**
+     * empty for local; required for OpenAI/Groq
+     */
+    "llmApiKey": string;
+
+    /** Creates a new AppSettings instance. */
+    constructor($$source: Partial<AppSettings> = {}) {
+        if (!("llmEndpoint" in $$source)) {
+            this["llmEndpoint"] = "";
+        }
+        if (!("llmModel" in $$source)) {
+            this["llmModel"] = "";
+        }
+        if (!("llmApiKey" in $$source)) {
+            this["llmApiKey"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AppSettings instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AppSettings {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AppSettings($$parsedSource as Partial<AppSettings>);
+    }
+}
+
+/**
  * Scene represents a single writing scene.
- * It is a cache record — the FilePath field points to the authoritative .md file.
- * Deleting this record does not delete the file.
  */
 export class Scene {
     "id": string;
     "title": string;
-
-    /**
-     * relative to project ScenesDir
-     */
     "filePath": string;
     "orderIndex": number;
     "wordCount": number;
-
-    /**
-     * Unix timestamp
-     */
     "lastModified": number;
-
-    /**
-     * CodeMirror offset
-     */
     "cursorPosition": number;
-
-    /**
-     * pixels, from scrollDOM
-     */
     "scrollTop": number;
 
     /** Creates a new Scene instance. */
@@ -76,21 +102,15 @@ export class Scene {
 }
 
 /**
- * SceneInsights is the full insights payload returned by GetInsights.
- * It combines entity data from SQLite with the current word count.
+ * SceneInsights is returned by GetInsights when loading a scene.
+ * InteractionsJSON is a raw JSON string to avoid re-encoding complexity at the IPC boundary.
  */
 export class SceneInsights {
     "sceneId": string;
-
-    /**
-     * candidate character names
-     */
     "entities": string[];
-
-    /**
-     * estimated dialogue segments
-     */
-    "dialogueCount": number;
+    "interactionsJSON": string;
+    "sceneTone": string;
+    "source": string;
     "wordCount": number;
 
     /** Creates a new SceneInsights instance. */
@@ -101,8 +121,14 @@ export class SceneInsights {
         if (!("entities" in $$source)) {
             this["entities"] = [];
         }
-        if (!("dialogueCount" in $$source)) {
-            this["dialogueCount"] = 0;
+        if (!("interactionsJSON" in $$source)) {
+            this["interactionsJSON"] = "";
+        }
+        if (!("sceneTone" in $$source)) {
+            this["sceneTone"] = "";
+        }
+        if (!("source" in $$source)) {
+            this["source"] = "";
         }
         if (!("wordCount" in $$source)) {
             this["wordCount"] = 0;

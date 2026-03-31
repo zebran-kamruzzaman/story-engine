@@ -1,4 +1,3 @@
-// Scene represents one writing scene. Maps to models.Scene in Go.
 export interface Scene {
   id: string
   title: string
@@ -10,18 +9,33 @@ export interface Scene {
   scrollTop: number
 }
 
-// SceneInsights is the full insights response from GetInsights(). Maps to models.SceneInsights.
+export interface CharacterInteraction {
+  characters: string[]
+  tone: string    // tense | warm | urgent | quiet | neutral
+  summary: string // prose margin note
+}
+
+// MirrorPayload is the live event payload from "mirror:updated" CustomEvent.
+export interface MirrorPayload {
+  sceneId: string
+  entities: string[]
+  interactions: CharacterInteraction[]
+  sceneTone: string
+  source: 'rule' | 'llm'
+}
+
+// SceneInsights is returned by GetInsights() when switching scenes.
 export interface SceneInsights {
   sceneId: string
   entities: string[]
-  dialogueCount: number
+  interactionsJSON: string  // raw JSON; parse to CharacterInteraction[]
+  sceneTone: string
+  source: string
   wordCount: number
 }
 
-// InsightsPayload is the event payload pushed by the backend after analysis.
-// Maps to models.InsightsPayload.
-export interface InsightsPayload {
-  sceneId: string
-  entities: string[]
-  dialogueCount: number
+export interface AppSettings {
+  llmEndpoint: string
+  llmModel: string
+  llmApiKey: string
 }

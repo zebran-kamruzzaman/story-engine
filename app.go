@@ -21,14 +21,17 @@ import (
 // App is the IPC coordinator. It owns all services and exposes methods to the
 // frontend. Initialize() must be called from main.go before app.Run().
 type App struct {
-	mainWindow *application.WebviewWindow
-	file       *services.FileService
-	cache      *services.CacheService
-	analysis   *services.AnalysisService
-	events     *services.EventService
-	project    *models.Project
-	ctx        context.Context
-	cancel     context.CancelFunc
+	mainWindow   *application.WebviewWindow
+	file         *services.FileService
+	cache        *services.CacheService
+	analysis     *services.AnalysisService
+	events       *services.EventService
+	llm          *services.LLMService
+	settings     models.AppSettings
+	project      *models.Project
+	ctx          context.Context
+	cancel       context.CancelFunc
+	settingsPath string
 }
 
 // Initialize sets up all services. It is called from main.go before app.Run()
@@ -71,6 +74,16 @@ func (a *App) Initialize(win *application.WebviewWindow) error {
 		EngineDir: engineDir,
 	}
 
+	// Load or create settings.json at ~/Documents/StoryEngine/settings.json.
+	settingsPath := filepath.Join(home, "Documents", "StoryEngine", "settings.json")
+	a.settings = models.DefaultSettings()
+	if data, err := os.ReadFile(settingsPath); err == nil {
+		if jsonErr := json.Unmarshal(data, &a.settings); jsonErr != nil {
+			log.Printf("initialize: warn: could not parse settings.json: %v", jsonErr)
+			a.settings = models.DefaultSettings()
+		}
+	}
+
 	// 4. Initialize SQLite.
 	dbPath := filepath.Join(engineDir, "project.db")
 	database, err := db.Initialize(dbPath)
@@ -83,6 +96,7 @@ func (a *App) Initialize(win *application.WebviewWindow) error {
 	a.file = services.NewFileService(projectDir)
 	a.events = services.NewEventService(win)
 	a.analysis = services.NewAnalysisService(a.cache, a.events)
+	a.llm = services.NewLLMService(a.settings)
 
 	// 9. Start background analysis goroutine.
 	a.analysis.Start(a.ctx)
@@ -235,6 +249,8 @@ func (a *App) SaveCursorState(id string, cursorPos int, scrollTop float64) error
 	return a.cache.UpdateCursorState(id, cursorPos, scrollTop)
 }
 
+// GetInsights returns the last-known mirror state for a scene.
+// Called when loading a scene so the panel shows previous results immediately.
 func (a *App) GetInsights(sceneID string) (models.SceneInsights, error) {
 	scene, err := a.cache.GetScene(sceneID)
 	if err != nil {
@@ -244,11 +260,87 @@ func (a *App) GetInsights(sceneID string) (models.SceneInsights, error) {
 	if err != nil {
 		return models.SceneInsights{}, fmt.Errorf("GetInsights: entities: %w", err)
 	}
+	interactionsJSON, sceneTone, source, err := a.cache.GetMirror(sceneID)
+	if err != nil {
+		log.Printf("GetInsights: mirror: %v", err)
+		interactionsJSON = "[]"
+		sceneTone = ""
+		source = "rule"
+	}
 	return models.SceneInsights{
-		SceneID:   sceneID,
-		Entities:  entities,
-		WordCount: scene.WordCount,
+		SceneID:          sceneID,
+		Entities:         entities,
+		InteractionsJSON: interactionsJSON,
+		SceneTone:        sceneTone,
+		Source:           source,
+		WordCount:        scene.WordCount,
 	}, nil
+}
+
+// AnalyzeScene sends the current scene content to the configured LLM and updates
+// the Mirror panel with the result. This is called by the brain icon in InsightsPanel.
+// It runs synchronously — the frontend awaits it and shows a loading state.
+// On success, a "mirror:updated" event is emitted automatically so the panel updates.
+func (a *App) AnalyzeScene(sceneID string) error {
+	// Read current content from disk (not cache — file is always source of truth).
+	scene, err := a.cache.GetScene(sceneID)
+	if err != nil {
+		return fmt.Errorf("AnalyzeScene: scene not found: %w", err)
+	}
+	content, err := a.file.ReadScene(filepath.Join(a.project.ScenesDir, scene.FilePath))
+	if err != nil {
+		return fmt.Errorf("AnalyzeScene: read file: %w", err)
+	}
+	if strings.TrimSpace(content) == "" {
+		return fmt.Errorf("AnalyzeScene: scene is empty")
+	}
+
+	// Call the LLM.
+	result, err := a.llm.AnalyzeScene(content)
+	if err != nil {
+		return fmt.Errorf("AnalyzeScene: %w", err)
+	}
+
+	// Persist character list and mirror data.
+	if err := a.cache.UpsertEntities(sceneID, result.Characters); err != nil {
+		log.Printf("AnalyzeScene: upsert entities: %v", err)
+	}
+
+	// Encode interactions to JSON for storage.
+	interactionsBytes, err := json.Marshal(result.Interactions)
+	interactionsJSON := "[]"
+	if err == nil {
+		interactionsJSON = string(interactionsBytes)
+	}
+	if err := a.cache.UpsertMirror(sceneID, interactionsJSON, result.SceneTone, "llm"); err != nil {
+		log.Printf("AnalyzeScene: upsert mirror: %v", err)
+	}
+
+	// Emit event to update the frontend immediately.
+	a.events.EmitMirrorUpdated(sceneID, result.Characters, result.Interactions, result.SceneTone, "llm")
+
+	return nil
+}
+
+// GetSettings returns the current LLM settings.
+func (a *App) GetSettings() (models.AppSettings, error) {
+	return a.settings, nil
+}
+
+// SaveSettings persists new LLM settings and hot-swaps the LLM service configuration.
+// The writer does not need to restart the app after changing settings.
+func (a *App) SaveSettings(settings models.AppSettings) error {
+	data, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return fmt.Errorf("SaveSettings: marshal: %w", err)
+	}
+	if err := os.WriteFile(a.settingsPath, data, 0644); err != nil {
+		return fmt.Errorf("SaveSettings: write: %w", err)
+	}
+	a.settings = settings
+	a.llm.UpdateConfig(settings)
+	log.Printf("settings saved: endpoint=%s model=%s", settings.LLMEndpoint, settings.LLMModel)
+	return nil
 }
 
 // ─────────────────────────────────

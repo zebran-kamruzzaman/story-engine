@@ -18,6 +18,16 @@ import * as application$0 from "../github.com/wailsapp/wails/v3/pkg/application/
 // @ts-ignore: Unused imports
 import * as models$0 from "./internal/models/models.js";
 
+/**
+ * AnalyzeScene sends the current scene content to the configured LLM and updates
+ * the Mirror panel with the result. This is called by the brain icon in InsightsPanel.
+ * It runs synchronously — the frontend awaits it and shows a loading state.
+ * On success, a "mirror:updated" event is emitted automatically so the panel updates.
+ */
+export function AnalyzeScene(sceneID: string): $CancellablePromise<void> {
+    return $Call.ByID(2052825417, sceneID);
+}
+
 export function CreateScene(title: string): $CancellablePromise<models$0.Scene> {
     return $Call.ByID(2007345907, title).then(($result: any) => {
         return $$createType0($result);
@@ -28,6 +38,10 @@ export function DeleteScene(id: string): $CancellablePromise<void> {
     return $Call.ByID(3853166994, id);
 }
 
+/**
+ * GetInsights returns the last-known mirror state for a scene.
+ * Called when loading a scene so the panel shows previous results immediately.
+ */
 export function GetInsights(sceneID: string): $CancellablePromise<models$0.SceneInsights> {
     return $Call.ByID(3201157490, sceneID).then(($result: any) => {
         return $$createType1($result);
@@ -41,6 +55,15 @@ export function GetSceneContent(id: string): $CancellablePromise<string> {
 export function GetScenes(): $CancellablePromise<models$0.Scene[]> {
     return $Call.ByID(1439475674).then(($result: any) => {
         return $$createType2($result);
+    });
+}
+
+/**
+ * GetSettings returns the current LLM settings.
+ */
+export function GetSettings(): $CancellablePromise<models$0.AppSettings> {
+    return $Call.ByID(2554697378).then(($result: any) => {
+        return $$createType3($result);
     });
 }
 
@@ -76,7 +99,16 @@ export function SaveSceneContent(id: string, content: string): $CancellablePromi
     return $Call.ByID(3606472253, id, content);
 }
 
+/**
+ * SaveSettings persists new LLM settings and hot-swaps the LLM service configuration.
+ * The writer does not need to restart the app after changing settings.
+ */
+export function SaveSettings(settings: models$0.AppSettings): $CancellablePromise<void> {
+    return $Call.ByID(1949631069, settings);
+}
+
 // Private type creation functions
 const $$createType0 = models$0.Scene.createFrom;
 const $$createType1 = models$0.SceneInsights.createFrom;
 const $$createType2 = $Create.Array($$createType0);
+const $$createType3 = models$0.AppSettings.createFrom;

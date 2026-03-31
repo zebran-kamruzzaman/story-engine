@@ -4,17 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"story-engine/internal/models"
-
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// EventService dispatches events from the Go backend to the React frontend.
-//
-// Wails v3 alpha.74 has unstable event types (WailsEvent, CustomEvent, etc.
-// keep changing between alphas). To avoid this entirely, we use ExecJS to
-// fire a standard DOM CustomEvent that the frontend listens to with
-// window.addEventListener — zero dependency on any alpha event API.
+// EventService dispatches events to the React frontend via ExecJS.
+// App.tsx listens with window.addEventListener('mirror:updated', handler).
 type EventService struct {
 	window *application.WebviewWindow
 }
@@ -23,17 +17,59 @@ func NewEventService(window *application.WebviewWindow) *EventService {
 	return &EventService{window: window}
 }
 
-// EmitInsightsUpdated fires a DOM CustomEvent named "insights:updated" in the
-// WebView. App.tsx listens for it with window.addEventListener.
-func (s *EventService) EmitInsightsUpdated(sceneID string, entities []string, dialogueCount int) {
+// mirrorEvent is the JSON shape sent to the frontend.
+// interactionEntry mirrors models.CharacterInteraction without importing models.
+type mirrorEvent struct {
+	SceneID      string             `json:"sceneId"`
+	Entities     []string           `json:"entities"`
+	Interactions []interactionEntry `json:"interactions"`
+	SceneTone    string             `json:"sceneTone"`
+	Source       string             `json:"source"`
+}
+
+type interactionEntry struct {
+	Characters []string `json:"characters"`
+	Tone       string   `json:"tone"`
+	Summary    string   `json:"summary"`
+}
+
+// EmitMirrorUpdated fires the "mirror:updated" CustomEvent in the WebView.
+// interactions may be nil for rule-based updates (only entities are populated).
+// source is "rule" for background analysis and "llm" for LLM analysis.
+func (s *EventService) EmitMirrorUpdated(
+	sceneID string,
+	entities []string,
+	interactions interface{},
+	sceneTone string,
+	source string,
+) {
 	if s.window == nil {
 		return
 	}
+	if entities == nil {
+		entities = []string{}
+	}
 
-	payload := models.InsightsPayload{
-		SceneID:       sceneID,
-		Entities:      entities,
-		DialogueCount: dialogueCount,
+	// Normalise interactions to our event type.
+	var entries []interactionEntry
+	if interactions != nil {
+		// interactions comes from LLMResult.Interactions — marshal/unmarshal
+		// to convert the anonymous struct slice to interactionEntry slice.
+		b, err := json.Marshal(interactions)
+		if err == nil {
+			_ = json.Unmarshal(b, &entries)
+		}
+	}
+	if entries == nil {
+		entries = []interactionEntry{}
+	}
+
+	payload := mirrorEvent{
+		SceneID:      sceneID,
+		Entities:     entities,
+		Interactions: entries,
+		SceneTone:    sceneTone,
+		Source:       source,
 	}
 
 	data, err := json.Marshal(payload)
@@ -41,10 +77,8 @@ func (s *EventService) EmitInsightsUpdated(sceneID string, entities []string, di
 		return
 	}
 
-	// Dispatch a standard browser CustomEvent. The frontend catches this with
-	// window.addEventListener('insights:updated', handler) in App.tsx.
 	js := fmt.Sprintf(
-		`window.dispatchEvent(new CustomEvent('insights:updated', {detail: %s}))`,
+		`window.dispatchEvent(new CustomEvent('mirror:updated', {detail: %s}))`,
 		string(data),
 	)
 	s.window.ExecJS(js)

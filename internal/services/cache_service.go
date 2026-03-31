@@ -233,6 +233,46 @@ func (s *CacheService) GetEntities(sceneID string) ([]string, error) {
 	return names, rows.Err()
 }
 
+// UpsertMirror stores the interaction analysis for a scene.
+// interactionsJSON must be a valid JSON array string.
+func (s *CacheService) UpsertMirror(sceneID string, interactionsJSON string, sceneTone string, source string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec(`
+		INSERT INTO scene_mirror (scene_id, interactions, scene_tone, source, updated_at)
+		VALUES (?, ?, ?, ?, strftime('%s','now'))
+		ON CONFLICT(scene_id) DO UPDATE SET
+			interactions = excluded.interactions,
+			scene_tone   = excluded.scene_tone,
+			source       = excluded.source,
+			updated_at   = excluded.updated_at
+	`, sceneID, interactionsJSON, sceneTone, source)
+	if err != nil {
+		return fmt.Errorf("cache: upsert mirror for %q: %w", sceneID, err)
+	}
+	return nil
+}
+
+// GetMirror retrieves the stored interaction JSON, scene tone, and source for a scene.
+// Returns safe empty values if no mirror data exists yet.
+func (s *CacheService) GetMirror(sceneID string) (interactionsJSON string, sceneTone string, source string, err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	row := s.db.QueryRow(`
+		SELECT interactions, scene_tone, source FROM scene_mirror WHERE scene_id = ?
+	`, sceneID)
+	err = row.Scan(&interactionsJSON, &sceneTone, &source)
+	if err == sql.ErrNoRows {
+		return "[]", "", "rule", nil
+	}
+	if err != nil {
+		return "", "", "", fmt.Errorf("cache: get mirror for %q: %w", sceneID, err)
+	}
+	return interactionsJSON, sceneTone, source, nil
+}
+
 // GetMaxOrderIndex returns the current highest order_index across all scenes,
 // used when appending a new scene to the end of the list.
 func (s *CacheService) GetMaxOrderIndex() (int, error) {

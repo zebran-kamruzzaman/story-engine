@@ -1,12 +1,20 @@
 import { create } from 'zustand'
-import type { InsightsPayload } from '../types'
+import type { MirrorPayload } from '../types'
 
 interface InsightsStore {
-  insights: InsightsPayload | null
-  setInsights: (payload: InsightsPayload) => void
+  mirror: MirrorPayload | null
+  isAnalyzing: boolean
+  analysisError: string | null
+  setMirror: (payload: MirrorPayload) => void
+  setAnalyzing: (v: boolean) => void
+  setAnalysisError: (msg: string | null) => void
 }
 
 export const useInsightsStore = create<InsightsStore>((set) => ({
-  insights: null,
-  setInsights: (payload) => set({ insights: payload }),
+  mirror: null,
+  isAnalyzing: false,
+  analysisError: null,
+  setMirror: (mirror) => set({ mirror, analysisError: null }),
+  setAnalyzing: (isAnalyzing) => set({ isAnalyzing }),
+  setAnalysisError: (analysisError) => set({ analysisError, isAnalyzing: false }),
 }))

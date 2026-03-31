@@ -1,16 +1,11 @@
 package db
 
-// Pragmas are applied immediately after the connection is opened.
-// They configure SQLite's behavior for this session.
 const pragmas = `
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
 PRAGMA busy_timeout=5000;
 `
 
-// schema is the full DDL for the application's tables and indexes.
-// Every CREATE statement uses IF NOT EXISTS, making initialization idempotent —
-// safe to call on an existing database without wiping data.
 const schema = `
 CREATE TABLE IF NOT EXISTS scenes (
     id              TEXT    PRIMARY KEY,
@@ -31,4 +26,12 @@ CREATE TABLE IF NOT EXISTS entities (
 );
 
 CREATE INDEX IF NOT EXISTS idx_entities_scene ON entities(scene_id);
+
+CREATE TABLE IF NOT EXISTS scene_mirror (
+    scene_id        TEXT    PRIMARY KEY REFERENCES scenes(id) ON DELETE CASCADE,
+    interactions    TEXT    NOT NULL DEFAULT '[]',
+    scene_tone      TEXT    NOT NULL DEFAULT '',
+    source          TEXT    NOT NULL DEFAULT 'rule',
+    updated_at      INTEGER NOT NULL DEFAULT 0
+);
 `
