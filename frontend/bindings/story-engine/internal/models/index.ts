@@ -3,6 +3,11 @@
 
 export {
     AppSettings,
+    CharacterProfile,
+    ChatMessage,
+    ChatResponse,
+    ProjectInfo,
     Scene,
-    SceneInsights
+    SceneInsights,
+    SceneSource
 } from "./models.js";

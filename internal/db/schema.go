@@ -26,12 +26,4 @@ CREATE TABLE IF NOT EXISTS entities (
 );
 
 CREATE INDEX IF NOT EXISTS idx_entities_scene ON entities(scene_id);
-
-CREATE TABLE IF NOT EXISTS scene_mirror (
-    scene_id        TEXT    PRIMARY KEY REFERENCES scenes(id) ON DELETE CASCADE,
-    interactions    TEXT    NOT NULL DEFAULT '[]',
-    scene_tone      TEXT    NOT NULL DEFAULT '',
-    source          TEXT    NOT NULL DEFAULT 'rule',
-    updated_at      INTEGER NOT NULL DEFAULT 0
-);
 `

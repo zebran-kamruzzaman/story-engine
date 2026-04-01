@@ -9,33 +9,59 @@ export interface Scene {
   scrollTop: number
 }
 
-export interface CharacterInteraction {
-  characters: string[]
-  tone: string    // tense | warm | urgent | quiet | neutral
-  summary: string // prose margin note
+export interface ProjectInfo {
+  name: string
+  path: string
+  createdAt: number
 }
 
-// MirrorPayload is the live event payload from "mirror:updated" CustomEvent.
-export interface MirrorPayload {
-  sceneId: string
-  entities: string[]
-  interactions: CharacterInteraction[]
-  sceneTone: string
-  source: 'rule' | 'llm'
+export interface CharacterProfile {
+  name: string
+  description: string
+  appearsIn: string[]
+  updatedAt: number
 }
 
-// SceneInsights is returned by GetInsights() when switching scenes.
 export interface SceneInsights {
   sceneId: string
-  entities: string[]
-  interactionsJSON: string  // raw JSON; parse to CharacterInteraction[]
-  sceneTone: string
-  source: string
-  wordCount: number
+  summary: string
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant' | string;
+  content: string
+  sources?: SceneSource[]
+}
+
+export interface SceneSource {
+  sceneId: string
+  title: string
+  score: number
+}
+
+export interface ChatResponse {
+  answer: string
+  sources: SceneSource[]
 }
 
 export interface AppSettings {
   llmEndpoint: string
   llmModel: string
   llmApiKey: string
+}
+
+// Event payloads — fired as DOM CustomEvents from Go via ExecJS.
+
+export interface EntitiesUpdatedPayload {
+  sceneId: string
+  entities: string[]
+}
+
+export interface CharactersUpdatedPayload {
+  [name: string]: CharacterProfile
+}
+
+export interface SceneSummaryUpdatedPayload {
+  sceneId: string
+  summary: string
 }

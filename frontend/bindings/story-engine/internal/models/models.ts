@@ -6,24 +6,14 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
- * AppSettings stores LLM configuration. Persisted to ~/Documents/StoryEngine/settings.json.
- * APIKey is optional — leave empty for local models (Ollama, LM Studio).
+ * AppSettings is persisted to ~/Documents/StoryEngine/app.json.
+ * APIKey is empty for local models (Ollama, LM Studio).
  */
 export class AppSettings {
-    /**
-     * e.g. "http://localhost:11434/v1"
-     */
     "llmEndpoint": string;
-
-    /**
-     * e.g. "llama3.2:3b"
-     */
     "llmModel": string;
-
-    /**
-     * empty for local; required for OpenAI/Groq
-     */
     "llmApiKey": string;
+    "lastProjectPath": string;
 
     /** Creates a new AppSettings instance. */
     constructor($$source: Partial<AppSettings> = {}) {
@@ -35,6 +25,9 @@ export class AppSettings {
         }
         if (!("llmApiKey" in $$source)) {
             this["llmApiKey"] = "";
+        }
+        if (!("lastProjectPath" in $$source)) {
+            this["lastProjectPath"] = "";
         }
 
         Object.assign(this, $$source);
@@ -50,7 +43,159 @@ export class AppSettings {
 }
 
 /**
- * Scene represents a single writing scene.
+ * CharacterProfile is one entry in the project-wide character roster.
+ */
+export class CharacterProfile {
+    "name": string;
+
+    /**
+     * LLM-generated
+     */
+    "description": string;
+
+    /**
+     * scene IDs
+     */
+    "appearsIn": string[];
+    "updatedAt": number;
+
+    /** Creates a new CharacterProfile instance. */
+    constructor($$source: Partial<CharacterProfile> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("description" in $$source)) {
+            this["description"] = "";
+        }
+        if (!("appearsIn" in $$source)) {
+            this["appearsIn"] = [];
+        }
+        if (!("updatedAt" in $$source)) {
+            this["updatedAt"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CharacterProfile instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CharacterProfile {
+        const $$createField2_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("appearsIn" in $$parsedSource) {
+            $$parsedSource["appearsIn"] = $$createField2_0($$parsedSource["appearsIn"]);
+        }
+        return new CharacterProfile($$parsedSource as Partial<CharacterProfile>);
+    }
+}
+
+/**
+ * ChatMessage is one turn in the project chat history.
+ */
+export class ChatMessage {
+    /**
+     * "user" | "assistant"
+     */
+    "role": string;
+    "content": string;
+
+    /**
+     * populated for assistant messages
+     */
+    "sources"?: SceneSource[];
+
+    /** Creates a new ChatMessage instance. */
+    constructor($$source: Partial<ChatMessage> = {}) {
+        if (!("role" in $$source)) {
+            this["role"] = "";
+        }
+        if (!("content" in $$source)) {
+            this["content"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ChatMessage instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ChatMessage {
+        const $$createField2_0 = $$createType2;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("sources" in $$parsedSource) {
+            $$parsedSource["sources"] = $$createField2_0($$parsedSource["sources"]);
+        }
+        return new ChatMessage($$parsedSource as Partial<ChatMessage>);
+    }
+}
+
+/**
+ * ChatResponse is returned by the AskQuestion IPC method.
+ */
+export class ChatResponse {
+    "answer": string;
+    "sources": SceneSource[];
+
+    /** Creates a new ChatResponse instance. */
+    constructor($$source: Partial<ChatResponse> = {}) {
+        if (!("answer" in $$source)) {
+            this["answer"] = "";
+        }
+        if (!("sources" in $$source)) {
+            this["sources"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ChatResponse instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ChatResponse {
+        const $$createField1_0 = $$createType2;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("sources" in $$parsedSource) {
+            $$parsedSource["sources"] = $$createField1_0($$parsedSource["sources"]);
+        }
+        return new ChatResponse($$parsedSource as Partial<ChatResponse>);
+    }
+}
+
+/**
+ * ProjectInfo is returned by GetProjects and GetCurrentProject.
+ */
+export class ProjectInfo {
+    "name": string;
+    "path": string;
+    "createdAt": number;
+
+    /** Creates a new ProjectInfo instance. */
+    constructor($$source: Partial<ProjectInfo> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("createdAt" in $$source)) {
+            this["createdAt"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ProjectInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ProjectInfo {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ProjectInfo($$parsedSource as Partial<ProjectInfo>);
+    }
+}
+
+/**
+ * Scene is a cache record. FilePath points to the authoritative .md file.
  */
 export class Scene {
     "id": string;
@@ -102,36 +247,23 @@ export class Scene {
 }
 
 /**
- * SceneInsights is returned by GetInsights when loading a scene.
- * InteractionsJSON is a raw JSON string to avoid re-encoding complexity at the IPC boundary.
+ * SceneInsights is returned by GetSceneInsights for the Mirror panel on scene switch.
  */
 export class SceneInsights {
     "sceneId": string;
-    "entities": string[];
-    "interactionsJSON": string;
-    "sceneTone": string;
-    "source": string;
-    "wordCount": number;
+
+    /**
+     * may be empty if not yet generated
+     */
+    "summary": string;
 
     /** Creates a new SceneInsights instance. */
     constructor($$source: Partial<SceneInsights> = {}) {
         if (!("sceneId" in $$source)) {
             this["sceneId"] = "";
         }
-        if (!("entities" in $$source)) {
-            this["entities"] = [];
-        }
-        if (!("interactionsJSON" in $$source)) {
-            this["interactionsJSON"] = "";
-        }
-        if (!("sceneTone" in $$source)) {
-            this["sceneTone"] = "";
-        }
-        if (!("source" in $$source)) {
-            this["source"] = "";
-        }
-        if (!("wordCount" in $$source)) {
-            this["wordCount"] = 0;
+        if (!("summary" in $$source)) {
+            this["summary"] = "";
         }
 
         Object.assign(this, $$source);
@@ -141,14 +273,44 @@ export class SceneInsights {
      * Creates a new SceneInsights instance from a string or object.
      */
     static createFrom($$source: any = {}): SceneInsights {
-        const $$createField1_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("entities" in $$parsedSource) {
-            $$parsedSource["entities"] = $$createField1_0($$parsedSource["entities"]);
-        }
         return new SceneInsights($$parsedSource as Partial<SceneInsights>);
+    }
+}
+
+/**
+ * SceneSource is a ranked scene reference in a chat response.
+ */
+export class SceneSource {
+    "sceneId": string;
+    "title": string;
+    "score": number;
+
+    /** Creates a new SceneSource instance. */
+    constructor($$source: Partial<SceneSource> = {}) {
+        if (!("sceneId" in $$source)) {
+            this["sceneId"] = "";
+        }
+        if (!("title" in $$source)) {
+            this["title"] = "";
+        }
+        if (!("score" in $$source)) {
+            this["score"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SceneSource instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SceneSource {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SceneSource($$parsedSource as Partial<SceneSource>);
     }
 }
 
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);
+const $$createType1 = SceneSource.createFrom;
+const $$createType2 = $Create.Array($$createType1);

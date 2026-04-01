@@ -1,6 +1,6 @@
 package models
 
-// Scene represents a single writing scene.
+// Scene is a cache record. FilePath points to the authoritative .md file.
 type Scene struct {
 	ID             string  `json:"id"`
 	Title          string  `json:"title"`
@@ -12,42 +12,65 @@ type Scene struct {
 	ScrollTop      float64 `json:"scrollTop"`
 }
 
-// CharacterInteraction describes a detected exchange between characters.
-// Summary is a prose-style margin note: "Elena and Marcus — heated argument."
-type CharacterInteraction struct {
-	Characters []string `json:"characters"`
-	Tone       string   `json:"tone"`    // tense | warm | urgent | quiet | neutral
-	Summary    string   `json:"summary"` // 6–12 words, written as a margin note
+// ProjectInfo is returned by GetProjects and GetCurrentProject.
+type ProjectInfo struct {
+	Name      string `json:"name"`
+	Path      string `json:"path"`
+	CreatedAt int64  `json:"createdAt"`
 }
 
-// MirrorPayload is the full analysis result, whether from rule-based or LLM analysis.
-// Source is "rule" for background analysis and "llm" for LLM analysis.
-// When source is "rule", Interactions will be empty and SceneTone will be "".
-type MirrorPayload struct {
-	SceneID      string                 `json:"sceneId"`
-	Entities     []string               `json:"entities"`
-	Interactions []CharacterInteraction `json:"interactions"`
-	SceneTone    string                 `json:"sceneTone"`
-	Source       string                 `json:"source"`
+// Project is the runtime project state. Fields without json tags are runtime-only.
+type Project struct {
+	Name      string `json:"name"`
+	CreatedAt int64  `json:"createdAt"`
+	Dir       string `json:"-"` // absolute path to project root
+	ScenesDir string `json:"-"`
+	MirrorDir string `json:"-"`
+	EngineDir string `json:"-"`
 }
 
-// SceneInsights is returned by GetInsights when loading a scene.
-// InteractionsJSON is a raw JSON string to avoid re-encoding complexity at the IPC boundary.
-type SceneInsights struct {
-	SceneID          string   `json:"sceneId"`
-	Entities         []string `json:"entities"`
-	InteractionsJSON string   `json:"interactionsJSON"`
-	SceneTone        string   `json:"sceneTone"`
-	Source           string   `json:"source"`
-	WordCount        int      `json:"wordCount"`
+// CharacterProfile is one entry in the project-wide character roster.
+type CharacterProfile struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"` // LLM-generated
+	AppearsIn   []string `json:"appearsIn"`   // scene IDs
+	UpdatedAt   int64    `json:"updatedAt"`
 }
 
-// AppSettings stores LLM configuration. Persisted to ~/Documents/StoryEngine/settings.json.
-// APIKey is optional — leave empty for local models (Ollama, LM Studio).
+// SceneSummary is the LLM-generated summary for one scene.
+type SceneSummary struct {
+	SceneID   string `json:"sceneId"`
+	Summary   string `json:"summary"`
+	UpdatedAt int64  `json:"updatedAt"`
+}
+
+// ChatMessage is one turn in the project chat history.
+type ChatMessage struct {
+	Role    string        `json:"role"` // "user" | "assistant"
+	Content string        `json:"content"`
+	Sources []SceneSource `json:"sources,omitempty"` // populated for assistant messages
+}
+
+// SceneSource is a ranked scene reference in a chat response.
+type SceneSource struct {
+	SceneID string `json:"sceneId"`
+	Title   string `json:"title"`
+	Score   int    `json:"score"`
+}
+
+// ChatResponse is returned by the AskQuestion IPC method.
+type ChatResponse struct {
+	Answer  string        `json:"answer"`
+	Sources []SceneSource `json:"sources"`
+}
+
+// AppSettings is persisted to ~/Documents/StoryEngine/app.json.
+// APIKey is empty for local models (Ollama, LM Studio).
 type AppSettings struct {
-	LLMEndpoint string `json:"llmEndpoint"` // e.g. "http://localhost:11434/v1"
-	LLMModel    string `json:"llmModel"`    // e.g. "llama3.2:3b"
-	LLMAPIKey   string `json:"llmApiKey"`   // empty for local; required for OpenAI/Groq
+	LLMEndpoint     string `json:"llmEndpoint"`
+	LLMModel        string `json:"llmModel"`
+	LLMAPIKey       string `json:"llmApiKey"`
+	LastProjectPath string `json:"lastProjectPath"`
 }
 
 // DefaultSettings returns sane defaults pointing at a local Ollama instance.
@@ -59,10 +82,8 @@ func DefaultSettings() AppSettings {
 	}
 }
 
-// Project is the runtime representation of project.json.
-type Project struct {
-	Name      string `json:"name"`
-	CreatedAt int64  `json:"createdAt"`
-	ScenesDir string `json:"-"`
-	EngineDir string `json:"-"`
+// SceneInsights is returned by GetSceneInsights for the Mirror panel on scene switch.
+type SceneInsights struct {
+	SceneID string `json:"sceneId"`
+	Summary string `json:"summary"` // may be empty if not yet generated
 }

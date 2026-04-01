@@ -177,6 +177,84 @@ func (s *CacheService) ReorderScene(id string, newIndex int) error {
 	return nil
 }
 
+// BatchReorderScenes assigns sequential order indices to scenes in the given order.
+// This is the correct, race-free way to reorder after a drag-and-drop operation.
+// The old ReorderScene method had a bug when moving items downward (leaving gaps).
+func (s *CacheService) BatchReorderScenes(orderedIDs []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("cache: begin batch reorder tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	for i, id := range orderedIDs {
+		if _, err := tx.Exec(`UPDATE scenes SET order_index = ? WHERE id = ?`, i, id); err != nil {
+			return fmt.Errorf("cache: batch reorder %q to %d: %w", id, i, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("cache: batch reorder commit: %w", err)
+	}
+	return nil
+}
+
+// GetAllEntities returns all unique entity names across all scenes, sorted by
+// the number of scenes they appear in (descending). Used for the project-wide
+// character roster.
+func (s *CacheService) GetAllEntities() ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	rows, err := s.db.Query(`
+		SELECT name
+		FROM entities
+		GROUP BY name
+		ORDER BY COUNT(DISTINCT scene_id) DESC, SUM(frequency) DESC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("cache: get all entities: %w", err)
+	}
+	defer rows.Close()
+
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("cache: scan entity name: %w", err)
+		}
+		names = append(names, name)
+	}
+	return names, rows.Err()
+}
+
+// GetEntitySceneIDs returns the IDs of all scenes that contain a given entity name.
+func (s *CacheService) GetEntitySceneIDs(name string) ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	rows, err := s.db.Query(`
+		SELECT DISTINCT scene_id FROM entities WHERE name = ?
+	`, name)
+	if err != nil {
+		return nil, fmt.Errorf("cache: get entity scene IDs: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("cache: scan scene id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 // UpsertEntities replaces the complete entity list for a scene.
 // Deletion of old entities is safe because of ON DELETE CASCADE.
 func (s *CacheService) UpsertEntities(sceneID string, entities []string) error {

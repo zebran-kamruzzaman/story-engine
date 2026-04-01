@@ -14,22 +14,16 @@ interface SceneStore {
 export const useSceneStore = create<SceneStore>((set) => ({
   scenes: [],
   activeSceneId: null,
-
   setScenes: (scenes) => set({ scenes }),
-
-  addScene: (scene) =>
-    set((state) => ({ scenes: [...state.scenes, scene] })),
-
+  addScene: (scene) => set((s) => ({ scenes: [...s.scenes, scene] })),
   removeScene: (id) =>
-    set((state) => ({
-      scenes: state.scenes.filter((s) => s.id !== id),
-      activeSceneId: state.activeSceneId === id ? null : state.activeSceneId,
+    set((s) => ({
+      scenes: s.scenes.filter((sc) => sc.id !== id),
+      activeSceneId: s.activeSceneId === id ? null : s.activeSceneId,
     })),
-
   updateScene: (id, updates) =>
-    set((state) => ({
-      scenes: state.scenes.map((s) => (s.id === id ? { ...s, ...updates } : s)),
+    set((s) => ({
+      scenes: s.scenes.map((sc) => (sc.id === id ? { ...sc, ...updates } : sc)),
     })),
-
   setActiveSceneId: (id) => set({ activeSceneId: id }),
 }))

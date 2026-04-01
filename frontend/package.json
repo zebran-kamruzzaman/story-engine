@@ -15,6 +15,7 @@
     "@codemirror/language": "^6.10.2",
     "@codemirror/state": "^6.4.1",
     "@codemirror/view": "^6.35.0",
+    "@hello-pangea/dnd": "^17.0.0",
     "@wailsio/runtime": "^3.0.0-alpha.74",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

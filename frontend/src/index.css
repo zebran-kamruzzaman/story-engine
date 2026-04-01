@@ -24,3 +24,16 @@
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2E2E2E; border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: #4A4A4A; }
+
+/* Drag handle cursor styles — override the default pointer on the grip icon */
+[data-rfd-drag-handle-context-id] {
+  cursor: grab;
+}
+[data-rfd-drag-handle-context-id]:active {
+  cursor: grabbing;
+}
+
+/* Prevent the entire app layout from shifting when a drag overlay appears */
+[data-rfd-droppable-id] {
+  min-height: 1px;
+}

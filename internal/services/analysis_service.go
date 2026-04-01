@@ -12,8 +12,8 @@ type AnalysisJob struct {
 	Content string
 }
 
-// AnalysisService runs fast rule-based analysis in a background goroutine.
-// It runs on every save. Deep LLM analysis is handled by app.go's AnalyzeScene IPC method.
+// AnalysisService runs fast rule-based entity detection in a background goroutine.
+// LLM analysis is triggered separately via app.go IPC methods.
 type AnalysisService struct {
 	workCh chan AnalysisJob
 	cache  *CacheService
@@ -50,22 +50,17 @@ func (s *AnalysisService) loop(ctx context.Context) {
 	}
 }
 
-// process runs character detection and emits a rule-based mirror update.
-// Interactions and SceneTone are empty in rule-based results — only the
-// LLM path fills those fields.
 func (s *AnalysisService) process(job AnalysisJob) {
 	entities := detectEntities(job.Content)
-
 	if err := s.cache.UpsertEntities(job.SceneID, entities); err != nil {
 		_ = err
 	}
-
-	s.events.EmitMirrorUpdated(job.SceneID, entities, nil, "", "rule")
+	// The background analysis only updates the entity list.
+	// Character descriptions and scene summaries require explicit LLM calls.
+	s.events.EmitEntitiesUpdated(job.SceneID, entities)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Rule-based character detection (unchanged from V1)
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Entity detection (unchanged from V1) ────────────────────────────────────
 
 var stopwords = map[string]bool{
 	"I": true, "The": true, "A": true, "An": true, "She": true, "He": true,
@@ -82,7 +77,6 @@ func detectEntities(text string) []string {
 	tokens := strings.Fields(text)
 	freq := make(map[string]int)
 	prevEndedSentence := true
-
 	for _, raw := range tokens {
 		stripped := stripPunct(raw)
 		if len(stripped) < 2 {
@@ -103,7 +97,6 @@ func detectEntities(text string) []string {
 		}
 		freq[stripped]++
 	}
-
 	type candidate struct {
 		name  string
 		count int
